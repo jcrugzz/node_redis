@@ -578,7 +578,7 @@ function reply_to_strings(reply) {
 }
 
 RedisClient.prototype.return_reply = function (reply) {
-    var command_obj, len, type, timestamp, argindex, args, queue_len;
+    var command_obj, len, type, timestamp, argindex, args, queue_len, callback;
 
     // If the "reply" here is actually a message received asynchronously due to a
     // pubsub subscription, don't pop the command queue as we'll only be consuming
@@ -615,10 +615,12 @@ RedisClient.prototype.return_reply = function (reply) {
                 reply = reply_to_object(reply);
             }
 
-            command_obj.callback(null, reply);
+            callback = command_obj.callback;
+            callback(null, reply);
         } else if (exports.debug_mode) {
             console.log("no callback for reply: " + (reply && reply.toString && reply.toString()));
         }
+        command_obj = null;
     } else if (this.pub_sub_mode || (command_obj && command_obj.sub_command)) {
         if (Array.isArray(reply)) {
             type = reply[0].toString();
@@ -641,7 +643,9 @@ RedisClient.prototype.return_reply = function (reply) {
                 // reply[1] can be null
                 var reply1String = (reply[1] === null) ? null : reply[1].toString();
                 if (command_obj && typeof command_obj.callback === "function") {
-                    command_obj.callback(null, reply1String);
+                    callback = command_obj.callback;
+                    callback(null, reply1String);
+                    command_obj = null;
                 }
                 this.emit(type, reply1String, reply[2]); // channel, count
             } else {
